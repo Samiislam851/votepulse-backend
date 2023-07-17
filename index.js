@@ -73,6 +73,14 @@ async function run() {
       let result = await cursor
       res.send(result)
     })
+
+    app.get("/electiontitle/:electionid", async (req, res) => {
+      let electionid = req.params.electionid
+      let cursor = electionsDocument.findOne({ _id: new ObjectId(electionid) });
+      let result = await cursor
+      res.send(result)
+    })
+    
     app.put("/election/:electionid/:status", async (req, res) => {
       let electionid = req.params.electionid
       let status = req.params.status
