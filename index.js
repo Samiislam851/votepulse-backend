@@ -1,6 +1,14 @@
 let express = require("express")
 let cors = require("cors")
 let app = express();
+const bodyParser = require('body-parser');
+const nodemailer = require('nodemailer');
+
+
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
+
+
 const jwt = require('jsonwebtoken');
 require('dotenv').config()
 const stripe = require('stripe')('sk_test_51NIabfCpvBGNsqQsxWU6lqpGW7YoVmaDdsq28EqNEByu3ROVDdTb9Qifm1qH5HPOF5nEDX5fbrannrp6GgkBmZHR00pljdX5dR')
@@ -40,6 +48,25 @@ let client = new MongoClient(uri, {
     deprecationErrors: true,
   }
 });
+const transporter = nodemailer.createTransport({
+  port: 465,
+  host: "smtp.gmail.com",
+  auth: {
+    user: 'samisiam851@gmail.com',
+    pass: 'mtsiqodfiaixvqyj',
+  },
+  secure: true, // upgrades later with STARTTLS -- change this based on the PORT
+});
+const generateRandomPin=()=> {
+  let pin = '';
+  for (let i = 0; i < 4; i++) {
+    const randomDigit = Math.floor(Math.random() * 10);
+    pin += randomDigit;
+  }
+  return pin;
+}
+
+
 
 async function run() {
   try {
@@ -51,13 +78,55 @@ async function run() {
     let enrolledClasses = database.collection("enrolledclasses")
     let candidateDocuments = database.collection("candidates")
     const usersCollection = database.collection("users");
-    const voteCollection = database.collection("votes");
+    const voteCollection = database.collection("votes"); 
     app.post('/jwt', (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
 
       res.send({ token })
     })
+
+
+
+    
+app.post('/sendotp', async (req, res) => {
+  const { to  } = req.body;
+  const randomPin = generateRandomPin();
+  const mailData = {
+    from: 'samisiam851@gmail.com',
+    to: to,
+    subject: "Get Your OTP",
+    text:  `Your OTP is ${randomPin}`,
+    html: `<b>Hey there! </b><br> Your OTP is ${randomPin}<br/>`,
+  };
+ const filter = { email:to };
+  const updateDoc = {
+    $set: {
+      otp: randomPin
+    },
+  };
+
+  const result = await usersCollection.updateOne(filter, updateDoc);
+
+
+  transporter.sendMail(mailData, (error, info) => {
+    if (error) {
+      return console.log(error);
+    }
+    res.status(200).send({ message: "Mail send", message_id: info.messageId });
+  });
+});
+
+app.post('/verifyotp', async (req, res) => {
+  const { otp, email  } = req.body; 
+   const result =  await usersCollection.find({email:email, otp:otp}).toArray();
+ if(result.length==0){
+  res.status(404).send({ message: "not exist"   });
+ }else{
+  res.status(200).send({ message: "exist"  });
+ }
+
+});
 
 
     // vote start
@@ -80,7 +149,7 @@ async function run() {
       let result = await cursor
       res.send(result)
     })
-    
+
     app.put("/election/:electionid/:status", async (req, res) => {
       let electionid = req.params.electionid
       let status = req.params.status
@@ -176,7 +245,7 @@ async function run() {
             email: e.email,
             role: "candidate",
             nid: e.nid,
-            vote:0
+            vote: 0
           };
 
           const options = { upsert: true };
@@ -276,8 +345,8 @@ async function run() {
 
       let candidateDocumentsFIndbyid = await candidateDocuments.findOne({ _id: new ObjectId(candidateId) });
       let vote = candidateDocumentsFIndbyid.vote
-       vote = vote  + 1;
-       const filter2 = { _id: new ObjectId(candidateId) };
+      vote = vote + 1;
+      const filter2 = { _id: new ObjectId(candidateId) };
       const updateDoc2 = {
         $set: {
           vote
@@ -285,7 +354,7 @@ async function run() {
       };
 
       const result2 = await candidateDocuments.updateOne(filter2, updateDoc2);
-   res.send(result2)
+      res.send(result2)
     })
 
 
