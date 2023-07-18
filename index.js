@@ -210,6 +210,28 @@ app.post('/verifyotp', async (req, res) => {
     //   "role": "voter",
     //   "nid": "3754926487"
     // }
+
+
+    app.delete("/delete/candidate/:candidateid/:electionid", async (req, res) => {
+      let candidateid = req.params.candidateid
+      let electionid = req.params.electionid
+       let query = {
+        // _id: new ObjectId(candidateid),
+        electionid:electionid,
+        userid:candidateid
+   }
+      let deleteData = await candidateDocuments.deleteOne(query);
+      if (deleteData.deletedCount == 1) {
+        res.send("Succesfully Deleted")
+      } else {
+        res.send(" Deleted Failed")
+
+      }
+
+    })
+
+
+
     app.post("/add/candidate/:electionid", async (req, res) => {
       const bodyData = req.body;
       let electionid = req.params.electionid
@@ -330,6 +352,14 @@ app.post('/verifyotp', async (req, res) => {
       let candidateId = bodyData.candidateId
       let useremail = bodyData.useremail
       let electionId = bodyData.electionId
+
+
+      let voteCheck = await voteCollection.find({ electionId: electionId, useremail: useremail }).toArray();
+      if (voteCheck.length >0) {
+       return res.status(403).send({ message: 'Already Voted' });
+      }
+       
+
       let filter = {
         _id: new ObjectId(candidateId)
       }
@@ -370,6 +400,21 @@ app.post('/verifyotp', async (req, res) => {
       res.send(result)
 
     })
+
+    app.get("/vote/check/user/:electionid/:email", async (req, res) => {
+      let electionid = req.params.electionid
+      let email = req.params.email
+      let result = await voteCollection.find({ electionId: electionid, useremail: email }).toArray();
+      if (result.length == 0) {
+        return res.send({
+          vote:false
+        })
+      }
+        res.status(403).send({ vote: true, message: 'no vote' });
+      
+
+    })
+
 
 
     // vote end
